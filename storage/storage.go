@@ -9,6 +9,8 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+const taskLimit = 10 // Константа для ограничения количества задач
+
 type Storage struct {
 	db *sql.DB
 }
@@ -19,13 +21,13 @@ func NewStorage(db *sql.DB) *Storage {
 
 func (s Storage) InitDatabase() {
 	querySQL := `
-		CREATE TABLE IF NOT EXISTS scheduler (
-		id INTEGER PRIMARY KEY,
-		date VARCHAR(8) NOT NULL,
-		title TEXT NOT NULL,
-		comment TEXT,
-		repeat VARCHAR(128));
-	    CREATE INDEX IF NOT EXISTS indexdate ON scheduler (date);`
+        CREATE TABLE IF NOT EXISTS scheduler (
+        id INTEGER PRIMARY KEY,
+        date VARCHAR(8) NOT NULL,
+        title TEXT NOT NULL,
+        comment TEXT,
+        repeat VARCHAR(128));
+        CREATE INDEX IF NOT EXISTS indexdate ON scheduler (date);`
 
 	log.Println("[INFO] Creating new table...")
 	_, err := s.db.Exec(querySQL)
@@ -42,7 +44,7 @@ func checkError(err error, s string) {
 
 func (s Storage) InsertTask(task model.Task) (int, error) {
 	querySQL := `INSERT INTO scheduler (date, title, comment, repeat) 
-	             VALUES (:date, :title, :comment, :repeat)`
+             VALUES (:date, :title, :comment, :repeat)`
 	res, err := s.db.Exec(querySQL,
 		sql.Named("date", task.Date),
 		sql.Named("title", task.Title),
@@ -64,10 +66,11 @@ func (s Storage) InsertTask(task model.Task) (int, error) {
 
 func (s Storage) SelectTasks() ([]model.Task, error) {
 	var tasks []model.Task
-	querySQL := `SELECT id, date, title, comment, repeat 
-				 FROM scheduler 
-				 ORDER BY date ASC
-				 LIMIT 10`
+	querySQL := fmt.Sprintf(`SELECT id, date, title, comment, repeat 
+                 FROM scheduler 
+                 ORDER BY date ASC
+                 LIMIT %d`, taskLimit) // Используем константу taskLit
+
 	rows, err := s.db.Query(querySQL)
 	if err != nil {
 		return nil, fmt.Errorf("query failed: %w", err)
@@ -79,9 +82,12 @@ func (s Storage) SelectTasks() ([]model.Task, error) {
 
 		err := rows.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scanning rows failed: %w", err)
 		}
 		tasks = append(tasks, task)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("reading rows failed: %w", err)
 	}
 	return tasks, nil
 }
@@ -89,8 +95,8 @@ func (s Storage) SelectTasks() ([]model.Task, error) {
 func (s Storage) SelectById(id int) (model.Task, error) {
 	var task model.Task
 	querySQL := `SELECT id, date, title, comment, repeat
- 				 FROM scheduler
- 				 WHERE id = :id`
+                  FROM scheduler
+                  WHERE id = :id`
 
 	row := s.db.QueryRow(querySQL, sql.Named("id", id))
 
@@ -104,8 +110,9 @@ func (s Storage) SelectById(id int) (model.Task, error) {
 
 func (s Storage) UpdateTask(task model.Task) error {
 	querySQL := `UPDATE scheduler 
-				 SET date = :date, title = :title, comment = :comment, repeat = :repeat 
-				 WHERE id = :id`
+	SET date = :date, title = :title, comment = :comment, repeat = :repeat 
+	WHERE id = :id`
+
 	res, err := s.db.Exec(querySQL,
 		sql.Named("id", task.ID),
 		sql.Named("date", task.Date),
@@ -130,7 +137,8 @@ func (s Storage) UpdateTask(task model.Task) error {
 
 func (s Storage) DeleteTask(id int) error {
 	querySQL := `DELETE FROM scheduler 
-				 WHERE id = :id`
+	WHERE id = :id`
+
 	res, err := s.db.Exec(querySQL, sql.Named("id", id))
 	if err != nil {
 		return fmt.Errorf("deleteTask failed: %w", err)
