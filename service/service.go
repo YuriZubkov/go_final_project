@@ -13,215 +13,227 @@ import (
 )
 
 type TaskService struct {
-	storage *storage.Storage
+    storage *storage.Storage
 }
 
 func NewTaskService(storage *storage.Storage) TaskService {
-	return TaskService{storage: storage}
+    return TaskService{storage: storage}
 }
 
 func (t TaskService) TasksHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	tasksFromDB, _ := t.storage.SelectTasks()
-	dtos := model.TasksToDto(tasksFromDB)
-	response := model.ResponseTasks{Dtos: dtos}
-	responseBody, err := json.Marshal(response)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
-		log.Println("json Marshal:", err)
-
-		return
-	}
-	log.Println("[Info] Success: tasks from DB are given")
-	w.Write(responseBody)
+    w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+    tasksFromDB, _ := t.storage.SelectTasks()
+    dtos := model.TasksToDto(tasksFromDB)
+    response := model.ResponseTasks{Dtos: dtos}
+    responseBody, err := json.Marshal(response)
+    if err != nil {
+        http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
+        log.Println("json Marshal:", err)
+        return
+    }
+    log.Println("[Info] Success: tasks from DB are given")
+    if _, err := w.Write(responseBody); err != nil {
+        http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
+        log.Println("w.Write:", err)
+        return
+    }
 }
 
 func (t TaskService) TaskHandler(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodPost:
-		t.addTask(w, r)
-	case http.MethodGet:
-		t.getTask(w, r)
-	case http.MethodPut:
-		t.editTask(w, r)
-	case http.MethodDelete:
-		t.removeTask(w, r)
-	}
+    switch r.Method {
+    case http.MethodPost:
+        t.addTask(w, r)
+    case http.MethodGet:
+        t.getTask(w, r)
+    case http.MethodPut:
+        t.editTask(w, r)
+    case http.MethodDelete:
+        t.removeTask(w, r)
+    }
 }
 
 func (t TaskService) removeTask(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.URL.Query().Get("id"))
-	if err != nil {
-		http.Error(w, `{"error":"wrong id"}`, http.StatusBadRequest)
-		log.Println("Atoi:", err)
+    id, err := strconv.Atoi(r.URL.Query().Get("id"))
+    if err != nil {
+        http.Error(w, `{"error":"wrong id"}`, http.StatusBadRequest)
+        log.Println("Atoi:", err)
+        return
+    }
 
-		return
-	}
+    err = t.storage.DeleteTask(id)
+    if err != nil {
+        http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
+        return
+    }
 
-	err = t.storage.DeleteTask(id)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
-
-		return
-	}
-
-	w.Write([]byte(`{}`))
+    if _, err := w.Write([]byte(`{}`)); err != nil {
+        http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
+        log.Println("w.Write:", err)
+        return
+    }
 }
 
 func (t TaskService) editTask(w http.ResponseWriter, r *http.Request) {
 
-	var inDTO model.DTO
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+    var inDTO model.DTO
+    w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
-	if err := json.NewDecoder(r.Body).Decode(&inDTO); err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
-		log.Println("json Decoder:", err)
+    if err := json.NewDecoder(r.Body).Decode(&inDTO); err != nil {
+        http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
+        log.Println("json Decoder:", err)
+        return
+    }
 
-		return
-	}
+    task, err := model.DtoToTask(inDTO)
+    if err != nil {
+        http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
+        log.Println("DtoToTask:", err)
+        return
+    }
 
-	task, err := model.DtoToTask(inDTO)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
-		log.Println("DtoToTask:", err)
+    if task.ID == 0 {
+        http.Error(w, `{"error":"wrong id"}`, http.StatusBadRequest)
+        return
+    }
 
-		return
-	}
+    err = t.storage.UpdateTask(task)
 
-	if task.ID == 0 {
-		http.Error(w, `{"error":"wrong id"}`, http.StatusBadRequest)
+    if err != nil {
+        http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
+        log.Println("UpdateTask:", err)
+        return
+    }
 
-		return
-	}
-
-	err = t.storage.UpdateTask(task)
-
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
-		log.Println("UpdateTask:", err)
-
-		return
-	}
-
-	w.Write([]byte(`{}`))
+    if _, err := w.Write([]byte(`{}`)); err != nil {
+        http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
+        log.Println("w.Write:", err)
+        return
+    }
 }
 
 func (t TaskService) getTask(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+    w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
-	num := r.FormValue("id")
-	if num == "" {
-		http.Error(w, `{"error":"true"}`, http.StatusBadRequest)
-		log.Println("[WARN] empty param")
-		return
-	}
+    num := r.FormValue("id")
+    if num == "" {
+        http.Error(w, `{"error":"true"}`, http.StatusBadRequest)
+        log.Println("[WARN] empty param")
+        return
+    }
 
-	id, err := strconv.Atoi(num)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
-		log.Println("[WARN] Failed convertation:", err)
-		return
-	}
+    id, err := strconv.Atoi(num)
+    if err != nil {
+        http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
+        log.Println("[WARN] Failed convertation:", err)
+        return
+    }
 
-	task, err := t.storage.SelectById(id)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
-		log.Println("[WARN] Failed convertation:", err)
-		return
-	}
+    task, err := t.storage.SelectById(id)
+    if err != nil {
+        http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
+        log.Println("[WARN] Failed convertation:", err)
+        return
+    }
 
-	dto := model.TaskToDto(task)
+    dto := model.TaskToDto(task)
 
-	responseBody, err := json.Marshal(dto)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
-		log.Println("json Marshal:", err)
+    responseBody, err := json.Marshal(dto)
+    if err != nil {
+        http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
+        log.Println("json Marshal:", err)
+        return
+    }
 
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	if _, err = w.Write(responseBody); err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
-	}
+    w.WriteHeader(http.StatusOK)
+    if _, err := w.Write(responseBody); err != nil {
+        http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
+        log.Println("w.Write:", err)
+        return
+    }
 }
 
 func (t TaskService) addTask(w http.ResponseWriter, r *http.Request) {
-	var inDTO model.DTO
+    var inDTO model.DTO
 
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	err := json.NewDecoder(r.Body).Decode(&inDTO)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
-		log.Println("[WARN] Failed json decoding:", err)
-		return
-	}
+    w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+    err := json.NewDecoder(r.Body).Decode(&inDTO)
+    if err != nil {
+        http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
+        log.Println("[WARN] Failed json decoding:", err)
+        return
+    }
 
-	task, err := model.DtoToTask(inDTO)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
-		log.Println("[WARN] Failed Dto-to-Task convertation:", err)
-		return
-	}
+    task, err := model.DtoToTask(inDTO)
+    if err != nil {
+        http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
+        log.Println("[WARN] Failed Dto-to-Task convertation:", err)
+        return
+    }
 
-	log.Println("[DTO ] : " + inDTO.Date + inDTO.Title + inDTO.Comment + inDTO.Repeat)
-	log.Println("[TASK] : " + task.Date + task.Title + task.Comment + task.Repeat)
+    log.Println("[DTO ] : " + inDTO.Date + inDTO.Title + inDTO.Comment + inDTO.Repeat)
+    log.Println("[TASK] : " + task.Date + task.Title + task.Comment + task.Repeat)
 
-	id, err := t.storage.InsertTask(task)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
-		log.Println("[WARN] Failed to add a task:", err)
-		return
-	}
+    id, err := t.storage.InsertTask(task)
+    if err != nil {
+        http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
+        log.Println("[WARN] Failed to add a task:", err)
+        return
+    }
 
-	log.Println("[Info] Success: Task added with id = " + strconv.Itoa(id))
-	w.Write([]byte(fmt.Sprintf(`{"id":"%d"}`, id)))
+    log.Println("[Info] Success: Task added with id = " + strconv.Itoa(id))
+    if _, err := w.Write([]byte(fmt.Sprintf(`{"id":"%d"}`, id))); err != nil {
+        http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
+        log.Println("w.Write:", err)
+        return
+    }
 }
 
 func (t TaskService) DoneHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	num := r.FormValue("id")
-	id, err := strconv.Atoi(num)
-	if err != nil {
-		http.Error(w, `{"error":"wrong id"}`, http.StatusBadRequest)
-		log.Println("Atoi:", err)
+    w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+    num := r.FormValue("id")
+    id, err := strconv.Atoi(num)
+    if err != nil {
+        http.Error(w, `{"error":"wrong id"}`, http.StatusBadRequest)
+        log.Println("Atoi:", err)
+        return
+    }
 
-		return
-	}
+    err = t.getTaskDone(id)
+    if err != nil {
+        http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
+        return
+    }
 
-	err = t.getTaskDone(id)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
-
-		return
-	}
-
-	w.Write([]byte(`{}`))
+    if _, err := w.Write([]byte(`{}`)); err != nil {
+        http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
+        log.Println("w.Write:", err)
+        return
+    }
 }
 
 func (t TaskService) getTaskDone(id int) error {
-	task, err := t.storage.SelectById(id)
-	if err != nil {
-		return fmt.Errorf(`{"error":"%s"}`, err.Error())
-	}
+    task, err := t.storage.SelectById(id)
+    if err != nil {
+        return fmt.Errorf(`{"error":"%s"}`, err.Error())
+    }
 
-	if task.Repeat == "" {
-		return t.storage.DeleteTask(id)
-	}
+    if task.Repeat == "" {
+        return t.storage.DeleteTask(id)
+    }
 
-	date, err := time.Parse("20060102", task.Date)
-	if err != nil {
-		return fmt.Errorf("invalid date format in db")
-	}
+    date, err := time.Parse("20060102", task.Date)
+    if err != nil {
+        return fmt.Errorf("invalid date format in db")
+    }
 
-	nextDate, _ := date_calc.CalculateNextDate(date, time.Now(), task.Repeat)
+    nextDate, _ := date_calc.CalculateNextDate(date, time.Now(), task.Repeat)
 
-	task.Date = nextDate.Format("20060102")
+    task.Date = nextDate.Format("20060102")
 
-	err = t.storage.UpdateTask(task)
-	if err != nil {
-		return err
-	}
+    err = t.storage.UpdateTask(task)
+    if err != nil {
+        return err
+    }
 
-	return nil
+    return nil
 }
