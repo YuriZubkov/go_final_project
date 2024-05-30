@@ -37,8 +37,17 @@ go mod download
 ```
 3. Запускаем сервис:
 ```shell
-go run *.go
+go run main.go
+
+Выход из приложения: Ctrl+C
+
 ```
+4. Запускаем тесты
+```shell
+go test ./tests
+
+
+
 Помимо API можно использовать вэб-интерфейс приложения по адресу:
 http://localhost:7540/
 

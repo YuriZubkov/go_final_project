@@ -10,14 +10,14 @@ import (
 )
 
 func NextDate(w http.ResponseWriter, r *http.Request) {
-	now := r.URL.Query().Get("now")
-	date := r.URL.Query().Get("date")
+	nowStr := r.URL.Query().Get("now")
+	dateStr := r.URL.Query().Get("date")
 	repeat := r.URL.Query().Get("repeat")
 
-	nowTime, err := time.Parse("20060102", now)
+	nowTime, err := time.Parse("20060102", nowStr)
 	checkErr(w, err, "parsing string now to date")
 
-	dateTime, err := time.Parse("20060102", date)
+	dateTime, err := time.Parse("20060102", dateStr)
 	checkErr(w, err, "parsing string date to date")
 
 	err = errorIfEmpty(repeat)
@@ -26,7 +26,7 @@ func NextDate(w http.ResponseWriter, r *http.Request) {
 	nextDate, err := CalculateNextDate(dateTime, nowTime, repeat)
 	checkErr(w, err, "bad calculating")
 
-	log.Println("[Info] FOR now =", now, "date =", date, "repeat =", repeat)
+	log.Println("[Info] FOR now =", nowStr, "date =", dateStr, "repeat =", repeat)
 	log.Println("[Info] nextDate =", nextDate.Format("20060102"), "err =", err)
 
 	w.Write([]byte(nextDate.Format("20060102")))

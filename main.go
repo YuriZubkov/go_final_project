@@ -37,8 +37,8 @@ func main() {
 	http.Handle("/", http.FileServer(http.Dir("./web/")))
 	http.Handle("/api/nextdate", http.HandlerFunc(date_calc.NextDate))
 	http.Handle("/api/task", http.HandlerFunc(t.TaskHandler))
-	http.Handle("GET /api/tasks", http.HandlerFunc(t.TasksHandler))
-	http.Handle("POST /api/task/done", http.HandlerFunc(t.DoneHandler))
+	http.Handle("/api/task/done", http.HandlerFunc(t.DoneHandler))
+	http.Handle("/api/tasks", http.HandlerFunc(t.TasksHandler))
 
 	// starting web-server
 	log.Println("[INFO] Starting server on port 7540...")

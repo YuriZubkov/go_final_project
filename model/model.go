@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 	date_calc "test/date_calculator"
 	"time"
@@ -28,46 +29,51 @@ type ResponseTasks struct {
 }
 
 func DtoToTask(dto DTO) (Task, error) {
-	if dto.Title == "" {
-		return Task{}, fmt.Errorf("empty title")
-	}
+    if dto.Title == "" {
+        return Task{}, fmt.Errorf("empty title")
+    }
 
-	y, m, d := time.Now().Date()
-	today := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
-	date := today
+    y, m, d := time.Now().Date()
+    today := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+    date := today
 
-	var err error
+    var err error
 
-	if dto.Date != "" {
-		date, err = time.Parse("20060102", dto.Date)
-		if err != nil {
-			return Task{}, fmt.Errorf("invalid date format")
-		}
-	}
+    if dto.Date != "" {
+        date, err = time.Parse("20060102", dto.Date)
+        if err != nil {
+            return Task{}, fmt.Errorf("invalid date format")
+        }
+    }
 
-	if date.Before(today) {
-		if dto.Repeat == "" {
-			date = today
-		} else {
-			date, err = date_calc.CalculateNextDate(date, today, dto.Repeat)
-			if err != nil {
-				return Task{}, fmt.Errorf("can't get next date: %w", err)
-			}
-		}
-	}
+    if date.Before(today) {
+        if dto.Repeat == "" {
+            date = today
+        } else {
+            date, err = date_calc.CalculateNextDate(date, today, dto.Repeat)
+            if err != nil {
+                return Task{}, fmt.Errorf("can't get next date: %w", err)
+            }
+        }
+    }
 
-	id := 0
-	if dto.ID != "" {
-		id, _ = strconv.Atoi(dto.ID)
-	}
+    id := 0
+    if dto.ID != "" {
+        id, err = strconv.Atoi(dto.ID)
+        if err != nil {
+            return Task{}, fmt.Errorf("invalid ID format")
+        }
+    }
 
-	return Task{
-		ID:      int(id),
-		Date:    date.Format("20060102"),
-		Title:   dto.Title,
-		Comment: dto.Comment,
-		Repeat:  dto.Repeat,
-	}, nil
+    log.Println("[Info] DtoToTask conversion: ID =", id, "Date =", date.Format("20060102"), "Title =", dto.Title, "Comment =", dto.Comment, "Repeat =", dto.Repeat)
+
+    return Task{
+        ID:      id,
+        Date:    date.Format("20060102"),
+        Title:   dto.Title,
+        Comment: dto.Comment,
+        Repeat:  dto.Repeat,
+    }, nil
 }
 
 func TasksToDto(tasks []Task) []DTO {
