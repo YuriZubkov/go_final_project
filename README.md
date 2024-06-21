@@ -55,4 +55,4 @@ http://localhost:7540/
 
 # Технологии
 
-Golang 1.22, REST API, SQL, SQLite, html, CSS
+Golang 1.22, REST API, SQL, SQLite, html, CSS, Docker
